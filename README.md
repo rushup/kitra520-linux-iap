@@ -18,5 +18,3 @@ Alternativelly you can also build on Artik:
 ```
 g++ -o out *.cpp
 ```
-
-on Artik.
