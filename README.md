@@ -12,3 +12,11 @@ arm-linux-gnueabi-g++ -o out *.cpp
 ```
 
 You need g++-arm-linux-gnueabihf toolchain installed.
+
+Alternativelly you can also build on Artik:
+
+```
+g++ -o out *.cpp
+```
+
+on Artik.
