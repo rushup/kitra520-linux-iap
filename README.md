@@ -8,7 +8,7 @@ Check kitra520 wiki about to see how to use it.
 To compile the project run
 
 ```
-arm-linux-gnueabi-g++ -o out *.cpp
+arm-linux-gnueabihf-g++ -o out *.cpp
 ```
 
 You need g++-arm-linux-gnueabihf toolchain installed.
