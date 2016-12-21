@@ -9,12 +9,13 @@
 
 using namespace std;
 
-#define KITRA_LINUX_IAP_VER 1
+#define KITRA_LINUX_IAP_VER 2
 
 serial k_serial;
 char* buffer;
 int buffer_index = 0;
 int size;
+bool wait_version = false;
 
 void loop_boot();
 
@@ -27,7 +28,7 @@ int main (int argc, char **argv)
         printf("Ex: /dev/tty0 fw.bin\n");
         return -1;
     }
-    printf("Kitra firmwre upgrade\n");
+    printf("Kitra firmwre upgrade V%d \n",KITRA_LINUX_IAP_VER);
     printf("Opening %s\n",argv[1]);
     if(k_serial.serialOpen(argv[1],115200) != -1)
     {
@@ -77,9 +78,8 @@ void k_output_iap_whoiam_handler(t_cmd_holder* cmd)
 
     k_serial.serialPuts(k_send_packet(&k_obj,0));
 
-    printf("Device found\n");
+    printf("Device found \n");
     printf("Clearing flash\n");
-
 }
 
 void k_output_iap_ack_handler(t_cmd_holder* cmd, bool nack)
@@ -136,28 +136,59 @@ void k_output_iap_new_end_handler(t_cmd_holder* cmd)
     exit(0);
 }
 
+void ask_switch_app()
+{
+    int c;
+    printf("Kitra is in bootloader mode, switch to application (system will be rebooted) ? (y/n) \n");
+    while(1)
+    {
+        c = getchar();
+        if(c == 'y')
+        {
+            k_input_iap_boot k_obj_res;
+            k_obj_res.id = K_INPUT_IAP_BOOT;
+            char* ptr = k_send_packet(&k_obj_res,0);
+            k_serial.serialPrintf(ptr);
+            printf("\n Rebooting system...");
+            system("shutdown now");
+            exit(-1);
+        }
+        else
+            exit(0);
+    }
+
+}
 void k_output_get_firmware_response_handler(t_cmd_holder* cmd)
 {
     int c;
     k_output_get_fw_response* k_obj = (k_output_get_fw_response*)cmd->obj;
     printf("Kitra HW_%d FW_%d EXTRA_%d \n",k_obj->hw_version,k_obj->fw_version,k_obj->extra);
-    printf("Do you want to switch to bootloader mode (WIll reboot system) ? (y/n): ");
-
-    while(1)
+    if(k_obj->extra != 0xFFFF)
     {
-        c = getchar();
-        if( c == 'y')
+        wait_version = true;
+        printf("Do you want to switch to bootloader mode (Will reboot system) ? (y/n): ");
+
+        while(1)
         {
-            k_input_start_fw_upgrade k_obj_res;
-            k_obj_res.id = K_INPUT_START_FW_UPGRADE;
-            char* ptr = k_send_packet(&k_obj_res,0);
-            k_serial.serialPrintf(ptr);
-            printf("\n Rebooting system...");
-            system("shutdown now");
-            break;
+            c = getchar();
+            if( c == 'y')
+            {
+                k_input_start_fw_upgrade k_obj_res;
+                k_obj_res.id = K_INPUT_START_FW_UPGRADE;
+                char* ptr = k_send_packet(&k_obj_res,0);
+                k_serial.serialPrintf(ptr);
+                printf("\n Rebooting system...");
+                system("shutdown now");
+                exit(-1);
+            }
+            else
+                exit(0);
         }
-        else
-            exit(0);
+
+    }
+    else if(buffer == NULL)
+    {
+        ask_switch_app();
     }
 }
 
@@ -168,7 +199,6 @@ void loop_boot()
      * if it doesn't it is in bootloader mode */
     clock_t start, end;
     char* ptr;
-    bool wait_version = false;
 
     k_input_get_firmware k_obj_get_fw;
     k_obj_get_fw.id = K_INPUT_GET_FIRMWARE;
@@ -199,7 +229,6 @@ void loop_boot()
                     k_output_iap_new_end_handler(cmd);
                     break;
                 case K_OUTPUT_GET_FW_RESPONSE:
-                    wait_version = true;
                     printf("Got version\n");
                     k_output_get_firmware_response_handler(cmd);
                     break;
@@ -213,6 +242,7 @@ void loop_boot()
             if(buffer == NULL)
             {
                 printf("We are in boot mode, no file specified \n");
+                ask_switch_app();
                 exit(0);
             }
 
